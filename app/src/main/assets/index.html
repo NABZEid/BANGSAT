@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>APK Builder</title>
+<script src="config.js"></script>
+<style>
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --ink:#14213d; --mut:#5d6b82; --line:#d9dfe9;
+  --ac:#3b4cca; --ac-d:#2d3aa3; --ok:#1f9d6b; --warn:#c77700; --err:#c0392b;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:15px/1.5 Roboto,"Segoe UI",system-ui,sans-serif;min-height:100vh;padding-bottom:env(safe-area-inset-bottom)}
+.screen,.tab{display:none}
+.screen.on,.tab.on{display:block}
+h1{font-size:26px;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:18px;margin:0 0 4px}
+p{margin:0 0 12px}
+.mut{color:var(--mut);font-size:13px}
+.wrap{max-width:520px;margin:0 auto;padding:20px 16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+label{display:block;font-weight:600;font-size:13px;margin:12px 0 5px}
+input[type=text],input[type=password],input[type=url],input[type=search]{
+  width:100%;padding:12px 13px;font:inherit;color:var(--ink);background:#fff;border:1.5px solid var(--line);border-radius:10px;outline:none}
+input:focus{border-color:var(--ac)}
+.btn{display:inline-block;border:0;border-radius:10px;padding:12px 16px;font:inherit;font-weight:600;background:var(--ac);color:#fff;text-decoration:none;text-align:center;cursor:pointer}
+.btn:active{background:var(--ac-d)}
+.btn.block{display:block;width:100%;margin-top:16px}
+.btn.alt{background:#e6e9f7;color:var(--ac-d)}
+.btn.ghost{background:transparent;color:var(--mut);border:1.5px solid var(--line)}
+.btn.sm{padding:8px 12px;font-size:13px}
+.btn[disabled]{opacity:.55;pointer-events:none}
+.msg{min-height:20px;margin-top:10px;font-size:13px;color:var(--err);word-break:break-word}
+.msg.ok{color:var(--ok)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.check{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:14px}
+.check input{margin-top:3px;width:18px;height:18px;accent-color:var(--ac)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.mark{width:38px;height:38px;border-radius:10px;background:var(--ink);display:grid;place-items:center}
+.mark svg{width:22px;height:22px}
+.link{background:none;border:0;color:var(--ac-d);font:inherit;font-size:13px;padding:6px 0;cursor:pointer;text-decoration:underline}
+details summary{cursor:pointer;color:var(--mut);font-size:13px;margin-top:14px}
+
+/* header + nav */
+.top{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.top b{font-size:16px}
+.top span{font-size:13px;opacity:.8}
+.pad{padding-bottom:84px}
+nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav button{flex:1;border:0;background:none;padding:12px 4px 10px;font:inherit;font-size:13px;font-weight:600;color:var(--mut);border-top:3px solid transparent;margin-top:-1px}
+nav button.on{color:var(--ac-d);border-top-color:var(--ac)}
+
+/* pipeline */
+#progress{display:none}
+ol.pipe{list-style:none;margin:0;padding:0}
+ol.pipe li{position:relative;padding:4px 0 14px 34px;color:var(--mut)}
+ol.pipe li::before{content:"";position:absolute;left:10px;top:24px;bottom:-2px;width:2px;background:var(--line)}
+ol.pipe li:last-child::before{display:none}
+ol.pipe li .dot{position:absolute;left:0;top:3px;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);background:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+ol.pipe li.active{color:var(--ink);font-weight:600}
+ol.pipe li.active .dot{border-color:var(--ac);border-top-color:transparent;animation:spin 0.9s linear infinite}
+ol.pipe li.done{color:var(--ink)}
+ol.pipe li.done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+ol.pipe li.done .dot::after{content:"\2713"}
+ol.pipe li.fail{color:var(--err);font-weight:600}
+ol.pipe li.fail .dot{background:var(--err);border-color:var(--err);color:#fff}
+ol.pipe li.fail .dot::after{content:"!"}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){ol.pipe li.active .dot{animation:none;border-top-color:var(--ac)}}
+#bstatus{font-size:13px;color:var(--mut);margin-top:6px;word-break:break-word}
+
+.result{border-color:var(--ok);border-width:2px}
+.result.bad{border-color:var(--err)}
+.result ol{margin:8px 0 0;padding-left:20px;font-size:14px}
+.result li{margin-bottom:4px}
+
+/* repo */
+.repo .rt{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:2px}
+.repo .rt b{word-break:break-all}
+.tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:#e6e9f7;color:var(--ac-d)}
+.tag.pv{background:#fdf0d8;color:var(--warn)}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.kv:last-child{border-bottom:0}
+.kv span:first-child{color:var(--mut)}
+.kv span:last-child{text-align:right;word-break:break-all}
+
+#toast{position:fixed;left:16px;right:16px;bottom:84px;background:var(--ink);color:#fff;padding:12px 14px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:488px;margin:0 auto}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="screen">
+  <div class="wrap">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></div>
+      <b style="font-size:17px">APK Builder</b>
+    </div>
+    <h1>Masuk</h1>
+    <p class="mut">Username dan password didapat dari admin lewat bot Telegram.</p>
+    <div class="card">
+      <label for="lu">Username</label>
+      <input id="lu" type="text" autocomplete="username" autocapitalize="none" spellcheck="false">
+      <label for="lp">Password</label>
+      <input id="lp" type="password" autocomplete="current-password">
+      <button id="lbtn" class="btn block" onclick="doLogin()">Masuk</button>
+      <div id="lmsg" class="msg"></div>
+      <details>
+        <summary>Server</summary>
+        <label for="ls">Alamat server login</label>
+        <input id="ls" type="url" placeholder="https://login.domainkamu.com" autocapitalize="none" spellcheck="false">
+        <div class="row"><button class="btn sm alt" onclick="saveServer()">Simpan alamat</button></div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<!-- OFFLINE -->
+<div id="offline" class="screen">
+  <div class="wrap">
+    <h1>Server tidak terjangkau</h1>
+    <p class="mut">Periksa koneksi internet, lalu coba lagi.</p>
+    <button class="btn" onclick="boot()">Coba lagi</button>
+    <button class="btn ghost" onclick="logout()">Keluar</button>
+  </div>
+</div>
+
+<!-- TOKEN GITHUB -->
+<div id="token" class="screen">
+  <div class="wrap">
+    <h1>Hubungkan GitHub</h1>
+    <p class="mut">APK dibuat di akun GitHub milikmu sendiri, jadi setiap user memakai token sendiri. Token hanya disimpan di HP ini.</p>
+    <div class="card">
+      <label for="tk">Personal access token (classic)</label>
+      <input id="tk" type="password" placeholder="ghp_..." autocapitalize="none" spellcheck="false" autocomplete="off">
+      <button id="tbtn" class="btn block" onclick="saveToken()">Simpan token</button>
+      <div id="tmsg" class="msg"></div>
+    </div>
+    <div class="card">
+      <h2>Cara membuat token</h2>
+      <ol style="padding-left:20px;margin:8px 0 0;font-size:14px">
+        <li>Buka halaman pembuatan token di bawah.</li>
+        <li>Centang scope <b>repo</b> dan <b>workflow</b>.</li>
+        <li>Tekan Generate token, salin, lalu tempel di atas.</li>
+      </ol>
+      <div class="row"><a class="btn sm alt" href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=APK%20Builder">Buat token di GitHub</a></div>
+    </div>
+    <button class="btn ghost" onclick="logout()">Keluar</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main" class="screen">
+  <div class="top"><b>APK Builder</b><span id="who"></span></div>
+
+  <section id="tab-build" class="tab pad">
+    <div class="wrap">
+      <h1>Buat APK baru</h1>
+      <p class="mut">Aplikasi dibungkus dari alamat website, dibuild di GitHub Actions, hasilnya satu APK universal.</p>
+      <div class="card">
+        <label for="bn">Nama aplikasi</label>
+        <input id="bn" type="text" maxlength="30" placeholder="Toko Saya">
+        <label for="bu">Alamat website</label>
+        <input id="bu" type="url" placeholder="https://tokosaya.com" autocapitalize="none" spellcheck="false">
+        <label class="check"><input id="bp" type="checkbox"><span>Repo privat<br><span class="mut">Download APK nanti butuh login GitHub di browser.</span></span></label>
+        <button id="bgo" class="btn block" onclick="startBuild()">Buat repo dan build APK</button>
+        <div id="bmsg" class="msg"></div>
+      </div>
+
+      <div id="progress" class="card">
+        <h2>Proses build</h2>
+        <ol id="steps" class="pipe"></ol>
+        <div id="bstatus"></div>
+      </div>
+      <div id="result"></div>
+    </div>
+  </section>
+
+  <section id="tab-repos" class="tab pad">
+    <div class="wrap">
+      <h1>Repo</h1>
+      <input id="rq" type="search" placeholder="Cari nama repo" oninput="renderRepos()">
+      <label class="check"><input id="ro" type="checkbox" checked onchange="renderRepos()"><span>Hanya repo hasil APK Builder</span></label>
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <span id="rcount" class="mut"></span>
+        <button class="btn sm alt" onclick="loadRepos()">Muat ulang</button>
+      </div>
+      <div id="rlist" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <section id="tab-akun" class="tab pad">
+    <div class="wrap">
+      <h1>Akun</h1>
+      <div class="card" id="akun"></div>
+      <button class="btn alt block" onclick="changeToken()">Ganti token GitHub</button>
+      <button class="btn ghost block" onclick="logout()">Keluar</button>
+    </div>
+  </section>
+
+  <nav>
+    <button data-tab="build" class="on" onclick="switchTab('build')">Buat APK</button>
+    <button data-tab="repos" onclick="switchTab('repos')">Repo</button>
+    <button data-tab="akun" onclick="switchTab('akun')">Akun</button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const b64 = s => btoa(unescape(encodeURIComponent(s)));
+
+const K_TOKEN = 'gh_token', K_SESS = 'session', K_DEV = 'device_id', K_API = 'api_url';
+let GH = null, SESS = null, ME = null, building = false;
+
+/* ---------- util UI ---------- */
+function show(id){ $$('.screen').forEach(e => e.classList.toggle('on', e.id === id)); window.scrollTo(0, 0); }
+function setMsg(sel, t, ok){ const e = $(sel); e.textContent = t || ''; e.className = 'msg' + (ok ? ' ok' : ''); }
+function toast(t){ const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2800); }
+function busy(sel, on, label){ const b = $(sel); if(on){ b.dataset.l = b.textContent; b.textContent = label || 'Memproses...'; b.disabled = true; } else { b.textContent = b.dataset.l || b.textContent; b.disabled = false; } }
+function switchTab(n){
+  $$('.tab').forEach(e => e.classList.toggle('on', e.id === 'tab-' + n));
+  $$('nav button').forEach(e => e.classList.toggle('on', e.dataset.tab === n));
+  window.scrollTo(0, 0);
+  if(n === 'repos' && !REPOS.length) loadRepos();
+  if(n === 'akun') renderAkun();
+}
+
+/* ---------- server login ---------- */
+function apiBase(){ return (localStorage.getItem(K_API) || LOGIN_API || '').replace(/\/+$/, ''); }
+function deviceId(){
+  let d = localStorage.getItem(K_DEV);
+  if(!d){
+    d = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2));
+    localStorage.setItem(K_DEV, d);
+  }
+  return d;
+}
+async function post(path, body){
+  const base = apiBase();
+  if(!base || base.indexOf('GANTI') !== -1) throw new Error('Alamat server login belum diatur. Buka menu Server di bawah.');
+  const r = await fetch(base + path, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+  let j = {}; try { j = await r.json(); } catch(e) {}
+  if(!r.ok) j.ok = false;
+  j.status = r.status;
+  return j;
+}
+function saveServer(){
+  let v = $('#ls').value.trim();
+  if(!v) return setMsg('#lmsg', 'Isi alamat server.');
+  if(!/^https?:\/\//i.test(v)) v = 'https://' + v;
+  localStorage.setItem(K_API, v.replace(/\/+$/, ''));
+  setMsg('#lmsg', 'Alamat server disimpan.', true);
+}
+async function doLogin(){
+  const u = $('#lu').value.trim(), p = $('#lp').value;
+  if(!u || !p) return setMsg('#lmsg', 'Isi username dan password.');
+  setMsg('#lmsg', ''); busy('#lbtn', true, 'Masuk...');
+  try{
+    const r = await post('/api/login', { username: u, password: p, device_id: deviceId() });
+    if(r.ok && r.token){
+      SESS = { token: r.token, username: r.username || u, expires_at: r.expires_at || null };
+      localStorage.setItem(K_SESS, JSON.stringify(SESS));
+      $('#lp').value = '';
+      afterLogin();
+    } else {
+      setMsg('#lmsg', r.message || 'Login gagal.');
+    }
+  } catch(e){
+    setMsg('#lmsg', e.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server.' : e.message);
+  }
+  busy('#lbtn', false);
+}
+async function boot(){
+  $('#ls').value = apiBase().indexOf('GANTI') === -1 ? apiBase() : '';
+  const s = localStorage.getItem(K_SESS);
+  if(!s){ show('login'); return; }
+  try { SESS = JSON.parse(s); } catch(e){ show('login'); return; }
+  try{
+    const r = await post('/api/verify', { token: SESS.token, device_id: deviceId() });
+    if(r.ok){ if(r.expires_at !== undefined) SESS.expires_at = r.expires_at; localStorage.setItem(K_SESS, JSON.stringify(SESS)); afterLogin(); }
+    else { clearAll(); show('login'); setMsg('#lmsg', r.message || 'Sesi berakhir, silakan masuk lagi.'); }
+  } catch(e){ show('offline'); }
+}
+function clearAll(){
+  localStorage.removeItem(K_SESS); localStorage.removeItem(K_TOKEN);
+  SESS = null; GH = null; ME = null; REPOS = [];
+}
+function logout(){
+  if(SESS){ post('/api/logout', { token: SESS.token }).catch(() => {}); }
+  clearAll(); setMsg('#lmsg', ''); show('login');
+}
+document.addEventListener('visibilitychange', async () => {
+  if(document.hidden || !SESS || !$('#main').classList.contains('on')) return;
+  try{
+    const r = await post('/api/verify', { token: SESS.token, device_id: deviceId() });
+    if(!r.ok && r.status && r.status < 500){ clearAll(); show('login'); setMsg('#lmsg', r.message || 'Sesi berakhir, silakan masuk lagi.'); }
+  } catch(e){}
+});
+
+/* ---------- GitHub ---------- */
+async function gh(path, opt){
+  opt = opt || {};
+  const h = { 'Accept': 'application/vnd.github+json', 'Authorization': 'Bearer ' + GH, 'X-GitHub-Api-Version': '2022-11-28' };
+  if(opt.body) h['Content-Type'] = 'application/json';
+  const r = await fetch('https://api.github.com' + path, { method: opt.method || 'GET', headers: h, body: opt.body });
+  const t = await r.text(); let j = null;
+  try { j = t ? JSON.parse(t) : null; } catch(e) {}
+  if(!r.ok){ const err = new Error((j && j.message) || ('HTTP ' + r.status)); err.status = r.status; throw err; }
+  return j;
+}
+function hint(e){
+  const m = e.message || String(e);
+  if(e.status === 401) return m + '. Token salah atau kedaluwarsa, ganti di menu Akun.';
+  if(/workflow/i.test(m)) return m + '. Token perlu scope "workflow".';
+  if(e.status === 403 || e.status === 404) return m + '. Pastikan token punya scope "repo" dan "workflow".';
+  if(m === 'Failed to fetch') return 'Tidak bisa terhubung ke GitHub. Periksa koneksi internet.';
+  return m;
+}
+function afterLogin(){
+  GH = localStorage.getItem(K_TOKEN);
+  if(!GH){ show('token'); return; }
+  gh('/user').then(me => { ME = me; enterMain(); })
+    .catch(e => { if(e.status === 401){ localStorage.removeItem(K_TOKEN); GH = null; show('token'); setMsg('#tmsg', 'Token GitHub tidak berlaku lagi. Masukkan token baru.'); } else { ME = null; enterMain(); } });
+}
+async function saveToken(){
+  const t = $('#tk').value.trim();
+  if(!t) return setMsg('#tmsg', 'Masukkan token GitHub.');
+  GH = t; setMsg('#tmsg', ''); busy('#tbtn', true, 'Memeriksa...');
+  try{
+    ME = await gh('/user');
+    localStorage.setItem(K_TOKEN, t); $('#tk').value = '';
+    enterMain();
+  } catch(e){ GH = null; setMsg('#tmsg', 'Token tidak valid: ' + hint(e)); }
+  busy('#tbtn', false);
+}
+function changeToken(){ localStorage.removeItem(K_TOKEN); GH = null; REPOS = []; show('token'); }
+function enterMain(){
+  $('#who').textContent = ME ? ('@' + ME.login) : (SESS ? SESS.username : '');
+  show('main'); switchTab('build');
+}
+
+/* ---------- template project APK ---------- */
+function genFiles(o){
+  const pkg = 'com.webapp.w' + Math.random().toString(16).slice(2, 8);
+  const javaStr = s => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const apk = o.slug + '.apk';
+  const files = [];
+  const add = (path, lines) => files.push({ path: path, content: (Array.isArray(lines) ? lines.join('\n') : lines) + '\n' });
+
+  add('settings.gradle', [
+    'pluginManagement {', '    repositories {', '        google()', '        mavenCentral()', '        gradlePluginPortal()', '    }', '}',
+    'dependencyResolutionManagement {', '    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)', '    repositories {', '        google()', '        mavenCentral()', '    }', '}',
+    'rootProject.name = "App"', "include ':app'"
+  ]);
+  add('build.gradle', [ 'plugins {', "    id 'com.android.application' version '8.5.2' apply false", '}' ]);
+  add('gradle.properties', [ 'org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8', 'android.nonTransitiveRClass=true' ]);
+  add('.gitignore', [ '.gradle/', 'build/', 'local.properties', '*.iml', '.idea/' ]);
+  add('app/build.gradle', [
+    'plugins {', "    id 'com.android.application'", '}', '',
+    'android {', "    namespace '" + pkg + "'", '    compileSdk 34', '',
+    '    defaultConfig {', "        applicationId '" + pkg + "'", '        minSdk 21', '        targetSdk 34', '        versionCode 1', "        versionName '1.0'", '    }', '',
+    '    compileOptions {', '        sourceCompatibility JavaVersion.VERSION_17', '        targetCompatibility JavaVersion.VERSION_17', '    }', '}'
+  ]);
+  add('app/src/main/AndroidManifest.xml', [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+    '    <uses-permission android:name="android.permission.INTERNET" />',
+    '    <application',
+    '        android:label="' + o.name + '"',
+    '        android:usesCleartextTraffic="true"',
+    '        android:theme="@android:style/Theme.Material.Light.NoActionBar">',
+    '        <activity',
+    '            android:name=".MainActivity"',
+    '            android:exported="true"',
+    '            android:windowSoftInputMode="adjustResize"',
+    '            android:configChanges="orientation|screenSize|keyboardHidden">',
+    '            <intent-filter>',
+    '                <action android:name="android.intent.action.MAIN" />',
+    '                <category android:name="android.intent.category.LAUNCHER" />',
+    '            </intent-filter>',
+    '        </activity>',
+    '    </application>',
+    '</manifest>'
+  ]);
+  add('app/src/main/java/' + pkg.replace(/\./g, '/') + '/MainActivity.java', [
+    'package ' + pkg + ';', '',
+    'import android.app.Activity;', 'import android.os.Bundle;', 'import android.webkit.WebChromeClient;', 'import android.webkit.WebSettings;', 'import android.webkit.WebView;', 'import android.webkit.WebViewClient;', '',
+    'public class MainActivity extends Activity {',
+    '    private WebView web;', '',
+    '    @Override',
+    '    protected void onCreate(Bundle savedInstanceState) {',
+    '        super.onCreate(savedInstanceState);',
+    '        web = new WebView(this);',
+    '        setContentView(web);',
+    '        WebSettings st = web.getSettings();',
+    '        st.setJavaScriptEnabled(true);',
+    '        st.setDomStorageEnabled(true);',
+    '        st.setMediaPlaybackRequiresUserGesture(false);',
+    '        web.setWebChromeClient(new WebChromeClient());',
+    '        web.setWebViewClient(new WebViewClient());',
+    '        web.loadUrl("' + javaStr(o.url) + '");',
+    '    }', '',
+    '    @Override',
+    '    public void onBackPressed() {',
+    '        if (web.canGoBack()) web.goBack();',
+    '        else super.onBackPressed();',
+    '    }',
+    '}'
+  ]);
+  add('.github/workflows/build.yml', [
+    'name: Build APK', '',
+    'on:', '  workflow_dispatch:', '',
+    'permissions:', '  contents: write', '',
+    'jobs:', '  build:', '    runs-on: ubuntu-latest', '    steps:',
+    '      - uses: actions/checkout@v4', '',
+    '      - uses: actions/setup-java@v4', '        with:', '          distribution: temurin', "          java-version: '17'", '',
+    '      - uses: gradle/actions/setup-gradle@v4', '        with:', "          gradle-version: '8.7'", '',
+    '      - name: Build APK universal', '        run: gradle assembleDebug --no-daemon --stacktrace', '',
+    '      - name: Siapkan file APK', '        run: cp app/build/outputs/apk/debug/app-debug.apk ' + apk, '',
+    '      - uses: actions/upload-artifact@v4', '        with:', '          name: ' + o.slug, '          path: ' + apk, '',
+    '      - uses: softprops/action-gh-release@v2', '        with:',
+    '          tag_name: v${{ github.run_number }}',
+    '          name: ' + o.name + ' v${{ github.run_number }}',
+    '          files: ' + apk
+  ]);
+  add('README.md', [ '# ' + o.name, '', 'Dibuat dengan APK Builder. Membungkus: ' + o.url, '', 'APK ada di halaman Releases setelah build selesai.' ]);
+  return { files: files, apk: apk };
+}
+
+/* ---------- alur build ---------- */
+const STEPS = ['Cek token GitHub', 'Buat repo baru', 'Upload project ke repo', 'Jalankan build', 'Tunggu build selesai'];
+function renderSteps(){ $('#steps').innerHTML = STEPS.map((s, i) => '<li id="st' + i + '"><span class="dot"></span>' + s + '</li>').join(''); }
+function step(i, state){ const e = $('#st' + i); if(e) e.className = state; }
+function status(t){ $('#bstatus').textContent = t || ''; }
+
+async function putFile(owner, repo, path, content, branch){
+  for(let i = 0; i < 4; i++){
+    try{
+      return await gh('/repos/' + owner + '/' + repo + '/contents/' + path, { method: 'PUT', body: JSON.stringify({ message: 'Add ' + path, content: b64(content), branch: branch }) });
+    } catch(e){ if(i === 3) throw e; await sleep(1500 * (i + 1)); }
+  }
+}
+async function dispatch(owner, repo, branch, retry){
+  const n = retry ? 10 : 1;
+  for(let i = 0; i < n; i++){
+    try{
+      await gh('/repos/' + owner + '/' + repo + '/actions/workflows/build.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: branch }) });
+      return;
+    } catch(e){ if(i === n - 1) throw e; await sleep(4000); }
+  }
+}
+async function waitRun(owner, repo){
+  const t0 = Date.now(), L = { queued: 'antre', in_progress: 'sedang berjalan', waiting: 'menunggu', requested: 'disiapkan', pending: 'menunggu' };
+  while(Date.now() - t0 < 30 * 60 * 1000){
+    await sleep(6000);
+    let run = null;
+    try{
+      const r = await gh('/repos/' + owner + '/' + repo + '/actions/runs?event=workflow_dispatch&per_page=1');
+      run = r.workflow_runs && r.workflow_runs[0];
+    } catch(e){}
+    const sec = Math.round((Date.now() - t0) / 1000);
+    if(run){
+      status('Status build: ' + (L[run.status] || run.status) + ' (' + sec + ' detik)');
+      if(run.status === 'completed') return run;
+    } else status('Menunggu GitHub Actions mulai... (' + sec + ' detik)');
+  }
+  throw new Error('Waktu tunggu habis (30 menit). Cek hasilnya di tab Repo.');
+}
+
+async function startBuild(){
+  if(building) return;
+  const name = $('#bn').value.replace(/[^A-Za-z0-9 ._-]/g, '').trim().slice(0, 30);
+  let url = $('#bu').value.trim();
+  if(!name) return setMsg('#bmsg', 'Isi nama aplikasi (huruf dan angka).');
+  if(url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+  let u; try { u = new URL(url); } catch(e){ return setMsg('#bmsg', 'Alamat website tidak valid.'); }
+  if(u.protocol !== 'http:' && u.protocol !== 'https:') return setMsg('#bmsg', 'Alamat website harus diawali http atau https.');
+
+  building = true; busy('#bgo', true, 'Sedang membuat...');
+  setMsg('#bmsg', ''); $('#result').innerHTML = ''; $('#progress').style.display = 'block'; renderSteps(); status('');
+  let cur = 0;
+  try{
+    step(0, 'active');
+    ME = await gh('/user'); const owner = ME.login;
+    step(0, 'done');
+
+    cur = 1; step(1, 'active');
+    const slug = (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'app').slice(0, 30);
+    let repo = '', created = null;
+    for(let i = 0; i < 3; i++){
+      repo = 'apk-' + slug + '-' + Math.random().toString(36).slice(2, 6);
+      try{
+        created = await gh('/user/repos', { method: 'POST', body: JSON.stringify({ name: repo, description: 'APK ' + name + ' (dibuat via APK Builder)', private: $('#bp').checked, auto_init: true }) });
+        break;
+      } catch(e){ if(e.status === 422 && i < 2) continue; throw e; }
+    }
+    const branch = created.default_branch || 'main';
+    step(1, 'done');
+
+    cur = 2; step(2, 'active'); await sleep(2000);
+    const gen = genFiles({ name: name, url: u.href, slug: slug });
+    let n = 0;
+    for(const f of gen.files){ n++; status('Upload ' + n + ' dari ' + gen.files.length + ': ' + f.path); await putFile(owner, repo, f.path, f.content, branch); }
+    try { await gh('/repos/' + owner + '/' + repo + '/topics', { method: 'PUT', body: JSON.stringify({ names: ['apk-builder'] }) }); } catch(e){}
+    step(2, 'done'); status('');
+
+    cur = 3; step(3, 'active'); await dispatch(owner, repo, branch, true); step(3, 'done');
+
+    cur = 4; step(4, 'active');
+    const run = await waitRun(owner, repo);
+    const base = 'https://github.com/' + owner + '/' + repo;
+    if(run.conclusion !== 'success'){
+      step(4, 'fail'); status('');
+      $('#result').innerHTML = '<div class="card result bad"><h2>Build gagal</h2><p class="mut">Lihat log di GitHub untuk detail errornya, lalu coba buat ulang.</p><div class="row"><a class="btn sm" href="' + esc(run.html_url) + '">Buka log build</a><a class="btn sm alt" href="' + base + '">Buka repo</a></div></div>';
+      REPOS = [];
+      return;
+    }
+    step(4, 'done'); status('');
+    let rel = null;
+    for(let i = 0; i < 8 && !rel; i++){ try { rel = await gh('/repos/' + owner + '/' + repo + '/releases/latest'); } catch(e){ await sleep(3000); } }
+    const asset = rel && rel.assets && rel.assets[0];
+    const priv = $('#bp').checked;
+    $('#result').innerHTML = '<div class="card result"><h2>APK siap diunduh</h2>' +
+      '<p class="mut">Repo <b>' + esc(repo) + '</b> sudah dibuat di akun GitHub kamu.</p>' +
+      '<ol><li>Tekan tombol Download APK, atau buka halaman Release.</li>' +
+      '<li>Di bagian Assets, pilih file <b>' + esc(gen.apk) + '</b>.</li>' +
+      '<li>Buka file hasil unduhan, izinkan install dari sumber ini, lalu Install.</li></ol>' +
+      (priv ? '<p class="mut" style="margin-top:10px">Repo privat: login ke GitHub di browser dulu agar bisa mengunduh.</p>' : '') +
+      '<div class="row">' + (asset ? '<a class="btn" href="' + esc(asset.browser_download_url) + '">Download APK</a>' : '') +
+      '<a class="btn alt" href="' + base + '/releases/latest">Halaman Release</a>' +
+      '<a class="btn ghost" href="' + base + '">Buka repo</a></div></div>';
+    REPOS = [];
+  } catch(e){
+    step(cur, 'fail'); status('');
+    setMsg('#bmsg', hint(e));
+  } finally {
+    building = false; busy('#bgo', false);
+  }
+}
+
+/* ---------- daftar repo ---------- */
+let REPOS = [];
+async function loadRepos(){
+  $('#rlist').innerHTML = '<div class="mut">Memuat daftar repo...</div>'; $('#rcount').textContent = '';
+  try{
+    let all = [];
+    for(let p = 1; p <= 5; p++){
+      const r = await gh('/user/repos?per_page=100&page=' + p + '&sort=created&direction=desc&affiliation=owner');
+      all = all.concat(r);
+      if(r.length < 100) break;
+    }
+    REPOS = all; renderRepos();
+  } catch(e){ $('#rlist').innerHTML = '<div class="msg">' + esc(hint(e)) + '</div>'; }
+}
+function renderRepos(){
+  const q = $('#rq').value.trim().toLowerCase(), only = $('#ro').checked;
+  const list = REPOS.filter(r => r.name.toLowerCase().indexOf(q) !== -1 && (!only || (r.topics || []).indexOf('apk-builder') !== -1));
+  $('#rcount').textContent = list.length + ' repo';
+  if(!list.length){ $('#rlist').innerHTML = '<div class="mut">' + (REPOS.length ? 'Tidak ada repo yang cocok.' : 'Belum ada repo. Buat APK pertamamu di tab Buat APK.') + '</div>'; return; }
+  $('#rlist').innerHTML = list.map(r => {
+    const mine = (r.topics || []).indexOf('apk-builder') !== -1;
+    return '<div class="card repo"><div class="rt"><b>' + esc(r.name) + '</b>' +
+      (mine ? '<span class="tag">APK</span>' : '') +
+      '<span class="tag' + (r.private ? ' pv' : '') + '">' + (r.private ? 'privat' : 'publik') + '</span></div>' +
+      '<div class="mut">' + esc((r.description || '').slice(0, 90)) + '</div>' +
+      '<div class="row"><a class="btn sm alt" href="' + esc(r.html_url) + '">Buka</a>' +
+      (mine ? '<a class="btn sm" href="' + esc(r.html_url) + '/releases/latest">Download APK</a><button class="btn sm ghost" data-rb="' + esc(r.name) + '">Build ulang</button>' : '') +
+      '</div></div>';
+  }).join('');
+}
+$('#rlist').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-rb]'); if(!b) return;
+  const r = REPOS.find(x => x.name === b.dataset.rb); if(!r) return;
+  b.disabled = true;
+  try{
+    await dispatch(r.owner.login, r.name, r.default_branch || 'main', false);
+    toast('Build dimulai. Hasilnya muncul di Release dalam beberapa menit.');
+  } catch(e){ toast(hint(e)); }
+  b.disabled = false;
+});
+
+/* ---------- akun ---------- */
+function renderAkun(){
+  const exp = SESS && SESS.expires_at ? new Date(SESS.expires_at).toLocaleString('id-ID') : 'Tanpa batas';
+  $('#akun').innerHTML =
+    '<div class="kv"><span>Username</span><span>' + esc(SESS ? SESS.username : '-') + '</span></div>' +
+    '<div class="kv"><span>Berlaku sampai</span><span>' + esc(exp) + '</span></div>' +
+    '<div class="kv"><span>Akun GitHub</span><span>' + esc(ME ? '@' + ME.login : '-') + '</span></div>';
+}
+
+$('#lp').addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
+boot();
+</script>
+</body>
+</html>
